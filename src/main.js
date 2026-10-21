@@ -400,13 +400,14 @@ const app = {
     const qrCanvas = ref(null)
     const activeTab = ref('company')
     const toast = ref('')
-    const showQr = ref(false)
     const handColor = ref('#b9342e')
     const handWidth = ref(7)
     const handSaved = ref(false)
     const handHistory = ref([])
     const handDrawing = ref(false)
-    const isHandSign = ref(new URLSearchParams(window.location.search).get('mode') === 'hand-sign' || (window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 700))
+    const query = typeof URLSearchParams === 'function' ? new URLSearchParams(window.location.search) : null
+    const coarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+    const isHandSign = ref(query?.get('mode') === 'hand-sign' || (coarsePointer && window.innerWidth < 700))
     const config = reactive({
       ...presets.company,
       mode: 'company',
@@ -426,7 +427,8 @@ const app = {
     function chooseTab(tab) {
       activeTab.value = tab
       Object.assign(config, presets[tab], { mode: tab, color: palettes.seal, opacity: 92, roughness: tab === 'signature' ? 12 : 0 })
-      repaint()
+      if (tab === 'signature') makeQr()
+      else repaint()
     }
     function chooseCenter(type) {
       config.centerType = type
@@ -448,12 +450,15 @@ const app = {
       const ratio = window.devicePixelRatio || 1
       canvasEl.width = 900 * ratio
       canvasEl.height = 520 * ratio
-      canvasEl.getContext('2d').scale(ratio, ratio)
+      const ctx = canvasEl.getContext('2d')
+      if (!ctx) return
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
       renderHand()
     }
     function renderHand() {
       if (!handCanvas.value) return
       const ctx = handCanvas.value.getContext('2d')
+      if (!ctx) return
       const ratio = window.devicePixelRatio || 1
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
       ctx.clearRect(0, 0, 900, 520)
@@ -476,7 +481,7 @@ const app = {
     }
     function startHand(event) {
       event.preventDefault()
-      handCanvas.value.setPointerCapture?.(event.pointerId)
+      if (typeof handCanvas.value.setPointerCapture === 'function') handCanvas.value.setPointerCapture(event.pointerId)
       handDrawing.value = true
       handSaved.value = false
       handHistory.value.push([{ ...handPoint(event), width: handWidth.value }])
@@ -505,13 +510,18 @@ const app = {
     async function makeQr() {
       await nextTick()
       if (!qrCanvas.value || isHandSign.value) return
-      QRCode.toCanvas(qrCanvas.value, handUrl.value, { width: 190, margin: 2, color: { dark: '#171817', light: '#ffffff' } })
+      await QRCode.toCanvas(qrCanvas.value, handUrl.value, { width: 240, margin: 2, color: { dark: '#171817', light: '#ffffff' } })
     }
-    function openQr() { showQr.value = true; makeQr() }
-    watch(config, repaint, { deep: true })
+    watch(config, () => {
+      if (activeTab.value !== 'signature') repaint()
+    }, { deep: true })
     watch([handColor, handWidth], renderHand)
-    onMounted(() => { repaint(); if (isHandSign.value) nextTick(initHandCanvas) })
-    return { canvas, handCanvas, qrCanvas, activeTab, config, typeName, toast, showQr, handColor, handWidth, handSaved, isHandSign, handUrl, chooseTab, chooseCenter, reset, download, startHand, drawHand, endHand, clearHand, undoHand, saveHand, openQr }
+    onMounted(async () => {
+      await nextTick()
+      if (isHandSign.value) initHandCanvas()
+      else repaint()
+    })
+    return { canvas, handCanvas, qrCanvas, activeTab, config, typeName, toast, handColor, handWidth, handSaved, handHistory, isHandSign, handUrl, chooseTab, chooseCenter, reset, download, startHand, drawHand, endHand, clearHand, undoHand, saveHand }
   },
   template: `
     <div v-if="isHandSign" class="hand-page">
@@ -571,17 +581,19 @@ const app = {
             <div class="color-row signature-color-row"><span>签名颜色</span><div class="swatches"><button v-for="item in [{c:'#ef1d2c', n:'朱红'},{c:'#1622da',n:'宝蓝'},{c:'#111111',n:'黑色'}]" :key="item.c" :title="item.n" :style="{background:item.c}" :class="['swatch',{selected:config.color===item.c}]" @click="config.color=item.c"></button></div></div>
           </section>
 
-          <section v-if="activeTab === 'signature'" class="control-section signature-section hand-entry-section"><div class="section-title"><span>01</span><h2>手绘签名</h2></div><p>用手机直接书写签名，完成后导出透明 PNG。</p><button class="hand-entry-button" @click="openQr"><span class="hand-entry-icon">⌁</span><span><strong>手机手绘签名</strong><small>扫码打开签名板</small></span><span class="hand-entry-arrow">→</span></button></section>
+          <section v-if="activeTab === 'signature'" class="control-section signature-section hand-entry-section"><div class="section-title"><span>01</span><h2>手绘签名</h2></div><p>使用手机扫描右侧二维码，直接打开手绘签名板。</p></section>
 
           <div class="sidebar-foot"><span class="lock">⌁</span><span>所有内容仅在你的浏览器中处理</span></div>
         </aside>
 
-        <section class="preview-area"><div class="preview-head"><div><span class="eyebrow">LIVE PREVIEW</span><h2>{{ typeName }} <span class="live-tag">LIVE</span></h2></div><div class="preview-meta"><span class="meta-chip">透明背景</span><span class="meta-chip">860 × 860 px</span></div></div>
-          <div class="canvas-stage"><div class="checkerboard"></div><canvas ref="canvas" aria-label="印章预览"></canvas><div class="stage-note">{{ activeTab === 'signature' ? '请扫码进入手绘签名板' : '拖拽控制即刻生效' }}</div></div>
-          <div class="preview-foot"><div class="tip"><span class="tip-mark">i</span><span>{{ activeTab === 'signature' ? '个人签名仅支持手机手绘，扫码后可导出透明 PNG。' : 'PNG 会保留透明背景，适合直接叠加到合同、文档或图片中。' }}</span></div><button v-if="activeTab !== 'signature'" class="primary-action" @click="download"><span>↓</span> 导出透明 PNG</button></div>
+        <section v-if="activeTab !== 'signature'" class="preview-area"><div class="preview-head"><div><span class="eyebrow">LIVE PREVIEW</span><h2>{{ typeName }} <span class="live-tag">LIVE</span></h2></div><div class="preview-meta"><span class="meta-chip">透明背景</span><span class="meta-chip">860 × 860 px</span></div></div>
+          <div class="canvas-stage"><div class="checkerboard"></div><canvas ref="canvas" aria-label="印章预览"></canvas><div class="stage-note">拖拽控制即刻生效</div></div>
+          <div class="preview-foot"><div class="tip"><span class="tip-mark">i</span><span>PNG 会保留透明背景，适合直接叠加到合同、文档或图片中。</span></div><button class="primary-action" @click="download"><span>↓</span> 导出透明 PNG</button></div>
+        </section>
+        <section v-else class="signature-qr-area">
+          <div class="signature-qr-content"><span class="eyebrow">MOBILE SIGNATURE</span><h2>手机手绘签名</h2><p>扫描二维码，在手机上书写并导出透明 PNG。</p><div class="signature-qr-frame"><canvas ref="qrCanvas" class="signature-qr-canvas" aria-label="手机手绘签名二维码"></canvas></div><div class="signature-qr-status"><span class="status-dot"></span><span>等待手机扫码</span></div><div class="signature-qr-url">{{ handUrl }}</div></div>
         </section>
       </main>
-      <div v-if="showQr" class="modal-backdrop" @click.self="showQr = false"><div class="qr-modal"><button class="modal-close" title="关闭" @click="showQr = false">×</button><span class="eyebrow">MOBILE SIGNATURE</span><h2>用手机手绘签名</h2><p>打开手机相机扫码，即可进入签名板。</p><canvas ref="qrCanvas" class="qr-canvas"></canvas><div class="qr-url">{{ handUrl }}</div></div></div>
       <transition name="toast"><div v-if="toast" class="toast">{{ toast }}</div></transition>
     </div>
   `,
