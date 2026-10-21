@@ -1,5 +1,5 @@
 // The app uses an inline template, so the compiler-enabled Vue build is required.
-import { createApp, computed, nextTick, onMounted, reactive, ref, watch } from 'vue/dist/vue.esm-bundler.js'
+import { createApp, computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue/dist/vue.esm-bundler.js'
 import QRCode from 'qrcode'
 import './style.css'
 
@@ -395,39 +395,40 @@ function applyDistress(ctx, canvas, roughness, color) {
 
 const app = {
   setup() {
+    const query = typeof URLSearchParams === 'function' ? new URLSearchParams(window.location.search) : null
+    const requestedTab = query?.get('tab')
+    const initialTab = ['company', 'personal', 'signature'].includes(requestedTab) ? requestedTab : 'company'
     const canvas = ref(null)
     const handCanvas = ref(null)
     const qrCanvas = ref(null)
-    const activeTab = ref('company')
+    const activeTab = ref(initialTab)
     const toast = ref('')
     const handColor = ref('#b9342e')
     const handWidth = ref(7)
     const handSaved = ref(false)
     const handHistory = ref([])
     const handDrawing = ref(false)
-    const query = typeof URLSearchParams === 'function' ? new URLSearchParams(window.location.search) : null
-    const coarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
-    const isHandSign = ref(query?.get('mode') === 'hand-sign' || (coarsePointer && window.innerWidth < 700))
+    const isMobileView = ref(window.innerWidth <= 860)
     const config = reactive({
-      ...presets.company,
-      mode: 'company',
+      ...presets[initialTab],
+      mode: initialTab,
       color: palettes.seal,
       opacity: 92,
       style: 'official',
-      roughness: 0,
+      roughness: initialTab === 'signature' ? 12 : 0,
       centerBorder: true,
       centerType: 'star',
       center: '★',
     })
     const currentPreset = computed(() => presets[activeTab.value])
     const typeName = computed(() => ({ company: '公司印章', personal: '个人印章', signature: '个人签名' }[activeTab.value]))
-    const handUrl = computed(() => `${window.location.origin}${window.location.pathname}?mode=hand-sign`)
+    const handUrl = computed(() => `${window.location.origin}${window.location.pathname}?tab=signature`)
 
     function repaint() { nextTick(() => drawSeal(canvas.value, config)) }
     function chooseTab(tab) {
       activeTab.value = tab
       Object.assign(config, presets[tab], { mode: tab, color: palettes.seal, opacity: 92, roughness: tab === 'signature' ? 12 : 0 })
-      if (tab === 'signature') makeQr()
+      if (tab === 'signature') prepareSignatureEntry()
       else repaint()
     }
     function chooseCenter(type) {
@@ -435,7 +436,6 @@ const app = {
       config.center = type === 'star' ? '★' : type === 'flower' ? '✤' : config.center
       repaint()
     }
-    function reset() { chooseTab(activeTab.value); toast.value = '已恢复默认样式'; setTimeout(() => (toast.value = ''), 1800) }
     function download() {
       const link = document.createElement('a')
       link.download = `${config.title || '我的印章'}.png`
@@ -509,34 +509,38 @@ const app = {
     }
     async function makeQr() {
       await nextTick()
-      if (!qrCanvas.value || isHandSign.value) return
+      if (!qrCanvas.value) return
       await QRCode.toCanvas(qrCanvas.value, handUrl.value, { width: 240, margin: 2, color: { dark: '#171817', light: '#ffffff' } })
+    }
+    async function prepareSignatureEntry() {
+      await nextTick()
+      if (isMobileView.value) initHandCanvas()
+      else makeQr()
+    }
+    function updateViewport() {
+      isMobileView.value = window.innerWidth <= 860
     }
     watch(config, () => {
       if (activeTab.value !== 'signature') repaint()
     }, { deep: true })
     watch([handColor, handWidth], renderHand)
+    watch(isMobileView, () => {
+      if (activeTab.value === 'signature') prepareSignatureEntry()
+    })
     onMounted(async () => {
+      window.addEventListener('resize', updateViewport)
       await nextTick()
-      if (isHandSign.value) initHandCanvas()
+      if (activeTab.value === 'signature') prepareSignatureEntry()
       else repaint()
     })
-    return { canvas, handCanvas, qrCanvas, activeTab, config, typeName, toast, handColor, handWidth, handSaved, handHistory, isHandSign, handUrl, chooseTab, chooseCenter, reset, download, startHand, drawHand, endHand, clearHand, undoHand, saveHand }
+    onBeforeUnmount(() => window.removeEventListener('resize', updateViewport))
+    return { canvas, handCanvas, qrCanvas, activeTab, config, typeName, toast, handColor, handWidth, handSaved, handHistory, isMobileView, handUrl, chooseTab, chooseCenter, download, startHand, drawHand, endHand, clearHand, undoHand, saveHand }
   },
   template: `
-    <div v-if="isHandSign" class="hand-page">
-      <header class="hand-topbar"><div class="brand"><span class="brand-mark">签</span><div><div class="brand-name">Seal Studio</div><div class="brand-caption">手机手绘签名板</div></div></div><span class="hand-private">本地处理 · 不上传</span></header>
-      <main class="hand-main"><div class="hand-intro"><span class="eyebrow">MOBILE SIGNATURE</span><h1>写下你的签名</h1><p>用手指或触控笔在下方签名板上书写，完成后导出透明 PNG。</p></div>
-        <div class="hand-board-wrap"><div class="hand-checker"></div><canvas ref="handCanvas" class="hand-canvas" @pointerdown="startHand" @pointermove="drawHand" @pointerup="endHand" @pointercancel="endHand" @pointerleave="endHand"></canvas><span class="hand-board-hint" v-if="!handHistory.length">在这里签名</span></div>
-        <div class="hand-tools"><div class="hand-colors"><span>颜色</span><button v-for="item in [{c:'#b9342e',n:'朱砂红'},{c:'#1622da',n:'宝蓝'},{c:'#111111',n:'黑色'}]" :key="item.c" :title="item.n" :style="{background:item.c}" :class="['swatch',{selected:handColor===item.c}]" @click="handColor=item.c"></button></div><label class="hand-width"><span>笔触</span><input type="range" min="3" max="14" v-model.number="handWidth" /></label><button class="ghost-action" @click="undoHand">↶ 撤销</button><button class="ghost-action" @click="clearHand">清空</button><button class="primary-action" @click="saveHand">↓ 导出透明 PNG</button></div>
-        <div class="hand-tip"><span class="tip-mark">i</span><span>签名只在当前设备中处理，不会上传服务器。</span></div>
-      </main>
-      <transition name="toast"><div v-if="toast" class="toast">{{ toast }}</div></transition>
-    </div>
-    <div v-else class="app-shell">
+    <div class="app-shell">
       <header class="topbar">
         <div class="brand"><span class="brand-mark">印</span><div><div class="brand-name">Seal Studio</div><div class="brand-caption">轻量印章生成器</div></div></div>
-        <div class="top-actions"><span class="status-dot"></span><span>本地生成 · 数据不上传</span><button class="icon-button" title="重置当前样式" @click="reset">↺</button><button v-if="activeTab !== 'signature'" class="download-button" @click="download"><span>↓</span> 下载 PNG</button></div>
+        <div class="top-actions"><span class="status-dot"></span><span>本地生成 · 数据不上传</span></div>
       </header>
 
       <main class="workspace">
@@ -581,7 +585,7 @@ const app = {
             <div class="color-row signature-color-row"><span>签名颜色</span><div class="swatches"><button v-for="item in [{c:'#ef1d2c', n:'朱红'},{c:'#1622da',n:'宝蓝'},{c:'#111111',n:'黑色'}]" :key="item.c" :title="item.n" :style="{background:item.c}" :class="['swatch',{selected:config.color===item.c}]" @click="config.color=item.c"></button></div></div>
           </section>
 
-          <section v-if="activeTab === 'signature'" class="control-section signature-section hand-entry-section"><div class="section-title"><span>01</span><h2>手绘签名</h2></div><p>使用手机扫描右侧二维码，直接打开手绘签名板。</p></section>
+          <section v-if="activeTab === 'signature'" class="control-section signature-section hand-entry-section"><div class="section-title"><span>01</span><h2>手绘签名</h2></div><p>{{ isMobileView ? '在下方签名板直接书写，完成后导出透明 PNG。' : '使用手机扫描右侧二维码，直接打开手绘签名板。' }}</p></section>
 
           <div class="sidebar-foot"><span class="lock">⌁</span><span>所有内容仅在你的浏览器中处理</span></div>
         </aside>
@@ -590,8 +594,11 @@ const app = {
           <div class="canvas-stage"><div class="checkerboard"></div><canvas ref="canvas" aria-label="印章预览"></canvas><div class="stage-note">拖拽控制即刻生效</div></div>
           <div class="preview-foot"><div class="tip"><span class="tip-mark">i</span><span>PNG 会保留透明背景，适合直接叠加到合同、文档或图片中。</span></div><button class="primary-action" @click="download"><span>↓</span> 导出透明 PNG</button></div>
         </section>
-        <section v-else class="signature-qr-area">
+        <section v-else-if="!isMobileView" class="signature-qr-area">
           <div class="signature-qr-content"><span class="eyebrow">MOBILE SIGNATURE</span><h2>手机手绘签名</h2><p>扫描二维码，在手机上书写并导出透明 PNG。</p><div class="signature-qr-frame"><canvas ref="qrCanvas" class="signature-qr-canvas" aria-label="手机手绘签名二维码"></canvas></div><div class="signature-qr-status"><span class="status-dot"></span><span>等待手机扫码</span></div><div class="signature-qr-url">{{ handUrl }}</div></div>
+        </section>
+        <section v-else class="signature-mobile-area">
+          <div class="signature-mobile-content"><div class="signature-mobile-head"><span class="eyebrow">HANDWRITTEN SIGNATURE</span><h2>手绘签名</h2></div><div class="hand-board-wrap"><div class="hand-checker"></div><canvas ref="handCanvas" class="hand-canvas" @pointerdown="startHand" @pointermove="drawHand" @pointerup="endHand" @pointercancel="endHand" @pointerleave="endHand"></canvas><span class="hand-board-hint" v-if="!handHistory.length">在这里签名</span></div><div class="hand-tools"><div class="hand-colors"><span>颜色</span><button v-for="item in [{c:'#b9342e',n:'朱砂红'},{c:'#1622da',n:'宝蓝'},{c:'#111111',n:'黑色'}]" :key="item.c" :title="item.n" :style="{background:item.c}" :class="['swatch',{selected:handColor===item.c}]" @click="handColor=item.c"></button></div><label class="hand-width"><span>笔触</span><input type="range" min="3" max="14" v-model.number="handWidth" /></label><button class="ghost-action" @click="undoHand">↶ 撤销</button><button class="ghost-action" @click="clearHand">清空</button><button class="primary-action" @click="saveHand">↓ 导出透明 PNG</button></div><div class="hand-tip"><span class="tip-mark">i</span><span>签名只在当前设备中处理，不会上传服务器。</span></div></div>
         </section>
       </main>
       <transition name="toast"><div v-if="toast" class="toast">{{ toast }}</div></transition>

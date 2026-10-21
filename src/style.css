@@ -13,9 +13,8 @@ button { cursor: pointer; }
 .brand-caption { margin-top: 3px; color: #958f85; font-size: 11px; letter-spacing: 1.5px; }
 .top-actions { display: flex; align-items: center; gap: 16px; color: #aaa49b; font-size: 12px; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #79b79b; box-shadow: 0 0 0 3px rgba(121,183,155,.16); }
-.icon-button { width: 30px; height: 30px; border: 1px solid #4d4b45; background: transparent; color: #cbc4b9; font-size: 19px; }
-.download-button, .primary-action { display: inline-flex; align-items: center; gap: 8px; border: 0; background: #b9342e; color: #fffaf4; padding: 11px 16px; font-size: 12px; font-weight: 600; letter-spacing: .2px; }
-.download-button:hover, .primary-action:hover { background: #a72d28; }
+.primary-action { display: inline-flex; align-items: center; gap: 8px; border: 0; background: #b9342e; color: #fffaf4; padding: 11px 16px; font-size: 12px; font-weight: 600; letter-spacing: .2px; }
+.primary-action:hover { background: #a72d28; }
 .workspace { min-height: calc(100vh - 76px); display: grid; grid-template-columns: 360px 1fr; }
 .sidebar { display: flex; flex-direction: column; background: #ebe8e1; border-right: 1px solid #d6d1c8; padding: 33px 28px 22px; }
 .sidebar-heading, .preview-head { display: flex; align-items: flex-start; justify-content: space-between; }
@@ -107,16 +106,13 @@ canvas { position: relative; width: 91%; height: 91%; max-width: 860px; }
 .signature-qr-canvas { width: 240px; height: 240px; display: block; }
 .signature-qr-status { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 19px; color: #69645d; font-size: 11px; }
 .signature-qr-url { max-width: 420px; margin: 13px auto 0; overflow: hidden; color: #a0988d; font: 10px "DM Mono", monospace; text-overflow: ellipsis; white-space: nowrap; }
+.signature-mobile-area { min-width: 0; padding: 30px 20px 40px; background: #f6f4ef; }
+.signature-mobile-content { width: min(620px, 100%); margin: 0 auto; }
+.signature-mobile-head h2 { margin-top: 7px; font-family: "Noto Serif SC", serif; font-size: 22px; letter-spacing: 0; }
+.signature-mobile-content .hand-board-wrap { margin-top: 20px; }
 .toast { position: fixed; left: 50%; bottom: 27px; transform: translateX(-50%); padding: 11px 17px; color: #fffaf4; background: #252521; box-shadow: 0 5px 18px rgba(0,0,0,.16); font-size: 12px; }
 .toast-enter-active, .toast-leave-active { transition: opacity .2s, transform .2s; }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translate(-50%, 8px); }
-.hand-page { min-height: 100vh; color: #22221f; background: #f6f4ef; }
-.hand-topbar { height: 68px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; color: #f5f1e9; background: #171817; }
-.hand-private { color: #9f9a90; font-size: 11px; }
-.hand-main { width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 42px 0 34px; }
-.hand-intro { text-align: center; }
-.hand-intro h1 { margin-top: 9px; font-family: "Noto Serif SC", serif; font-size: 29px; letter-spacing: 1px; }
-.hand-intro p { margin: 11px auto 0; color: #969087; font-size: 12px; }
 .hand-board-wrap { position: relative; width: 100%; aspect-ratio: 900 / 520; margin-top: 31px; overflow: hidden; border: 1px solid #d9d3c9; background: #fbfaf7; touch-action: none; }
 .hand-checker { position: absolute; inset: 0; opacity: .57; background-image: linear-gradient(45deg, #f0ede7 25%, transparent 25%), linear-gradient(-45deg, #f0ede7 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0ede7 75%), linear-gradient(-45deg, transparent 75%, #f0ede7 75%); background-position: 0 0, 0 10px, 10px -10px, -10px 0; background-size: 20px 20px; }
 .hand-canvas { position: relative; z-index: 1; width: 100%; height: 100%; display: block; cursor: crosshair; }
@@ -129,6 +125,6 @@ canvas { position: relative; width: 91%; height: 91%; max-width: 860px; }
 .ghost-action:hover { border-color: #b9342e; color: #a62f2b; }
 .hand-tools .primary-action { margin-left: auto; }
 .hand-tip { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 19px; color: #9a9286; font-size: 11px; }
-@media (max-width: 860px) { .topbar { padding: 0 18px; } .top-actions > span:not(.status-dot), .icon-button { display: none; } .workspace { grid-template-columns: 1fr; } .sidebar { border-right: 0; border-bottom: 1px solid #d6d1c8; padding: 24px 20px 18px; } .sidebar-foot { display: none; } .preview-area { padding: 31px 20px 40px; } .canvas-stage, .preview-foot { width: min(92vw, 620px); } .signature-qr-area { min-height: 620px; padding: 40px 20px; } .control-section { margin-top: 23px; } }
-@media (max-width: 640px) { .hand-topbar { height: 62px; padding: 0 16px; } .hand-private { display: none; } .hand-main { width: calc(100% - 24px); padding-top: 30px; } .hand-intro h1 { font-size: 25px; } .hand-intro p { max-width: 300px; line-height: 1.6; } .hand-board-wrap { margin-top: 25px; aspect-ratio: 1.45; } .hand-tools { flex-wrap: wrap; gap: 11px; } .hand-width { width: 118px; } .hand-tools .primary-action { width: 100%; justify-content: center; margin-left: 0; order: 3; } }
-@media (max-width: 480px) { .brand-caption { display: none; } .download-button { padding: 10px 11px; } .preview-head { display: block; } .preview-meta { padding-top: 14px; } .canvas-stage { margin-top: 22px; } .preview-foot { display: block; } .tip { margin-bottom: 18px; } .primary-action { width: 100%; justify-content: center; } }
+@media (max-width: 860px) { .topbar { padding: 0 18px; } .top-actions > span:not(.status-dot) { display: none; } .workspace { grid-template-columns: 1fr; } .sidebar { border-right: 0; border-bottom: 1px solid #d6d1c8; padding: 24px 20px 18px; } .sidebar-foot { display: none; } .preview-area { padding: 31px 20px 40px; } .canvas-stage, .preview-foot { width: min(92vw, 620px); } .signature-qr-area { min-height: 620px; padding: 40px 20px; } .control-section { margin-top: 23px; } }
+@media (max-width: 640px) { .hand-board-wrap { margin-top: 25px; aspect-ratio: 1.45; } .hand-tools { flex-wrap: wrap; gap: 11px; } .hand-width { width: 118px; } .hand-tools .primary-action { width: 100%; justify-content: center; margin-left: 0; order: 3; } }
+@media (max-width: 480px) { .brand-caption { display: none; } .preview-head { display: block; } .preview-meta { padding-top: 14px; } .canvas-stage { margin-top: 22px; } .preview-foot { display: block; } .tip { margin-bottom: 18px; } .primary-action { width: 100%; justify-content: center; } }
