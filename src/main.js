@@ -178,9 +178,9 @@ function drawCompanySeal(ctx, config, color) {
     ctx.font = `${Math.round(132 * sizeScale)}px serif`
     ctx.fillText('★', cx, cy + 8)
   }
-  const horizontal = config.horizontalText.trim() || config.subTitle.trim()
+  const horizontal = config.horizontalText.trim()
   if (horizontal) { ctx.font = `700 ${Math.round(38 * sizeScale)}px "Noto Serif SC", "Songti SC", serif`; ctx.fillText(horizontal, cx, cy + (isEllipse ? 42 : 112)) }
-  const bottom = config.bottomText.trim() || config.code.trim()
+  const bottom = config.bottomText.trim()
   if (bottom) {
     ctx.font = `${Math.round(19 * sizeScale)}px ui-monospace, SFMono-Regular, Menlo, monospace`
     if (config.bottomTextStyle === 'arc') {
@@ -454,37 +454,49 @@ const app = {
         return false
       }
     }
+    function triggerPngDownload(image) {
+      const link = document.createElement('a')
+      link.download = image.filename
+      link.href = image.objectUrl || image.dataUrl
+      link.hidden = true
+      document.body.append(link)
+      link.click()
+      link.remove()
+    }
     async function saveCanvasPng(canvasEl, name) {
       if (!canvasEl) throw new Error('Canvas is not ready')
       const image = makePngFile(canvasEl, name)
       const prefersMobileSave = isMobileView.value || window.matchMedia?.('(pointer: coarse)').matches
 
       if (prefersMobileSave) {
-        if (canShareFile(image.file)) {
-          try {
-            await navigator.share({ files: [image.file], title: image.filename })
-            return 'shared'
-          } catch (error) {
-            if (error?.name === 'AbortError') return 'cancelled'
-          }
-        }
-
-        savePreview.value = { src: image.dataUrl, filename: image.filename }
+        const objectUrl = URL.createObjectURL(image.blob)
+        savePreview.value = { ...image, objectUrl, canShare: canShareFile(image.file) }
         return 'preview'
       }
 
       const objectUrl = URL.createObjectURL(image.blob)
-      const link = document.createElement('a')
-      link.download = image.filename
-      link.href = objectUrl
-      link.hidden = true
-      document.body.append(link)
-      link.click()
-      link.remove()
+      triggerPngDownload({ ...image, objectUrl })
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000)
       return 'download'
     }
-    function closeSavePreview() { savePreview.value = null }
+    function downloadSavePreview() {
+      if (!savePreview.value) return
+      triggerPngDownload(savePreview.value)
+      showToast('已发起下载；若未保存，请长按图片保存')
+    }
+    async function shareSavePreview() {
+      const image = savePreview.value
+      if (!image?.canShare) return
+      try {
+        await navigator.share({ files: [image.file], title: image.filename })
+      } catch (error) {
+        if (error?.name !== 'AbortError') showToast('系统分享不可用，请长按图片保存')
+      }
+    }
+    function closeSavePreview() {
+      if (savePreview.value?.objectUrl) URL.revokeObjectURL(savePreview.value.objectUrl)
+      savePreview.value = null
+    }
 
     function repaint() { nextTick(() => drawSeal(canvas.value, config)) }
     function chooseTab(tab) {
@@ -617,8 +629,11 @@ const app = {
       if (activeTab.value === 'signature') prepareSignatureEntry()
       else repaint()
     })
-    onBeforeUnmount(() => window.removeEventListener('resize', updateViewport))
-    return { canvas, handCanvas, qrCanvas, activeTab, config, typeName, toast, savePreview, companyDisclaimerOpen, companyDisclaimerAccepted, handColor, handWidth, handSaved, handHistory, isMobileView, handUrl, chooseTab, chooseCenter, download, closeSavePreview, closeCompanyDisclaimer, confirmCompanyDisclaimer, startHand, drawHand, endHand, clearHand, undoHand, saveHand }
+    onBeforeUnmount(() => {
+      window.removeEventListener('resize', updateViewport)
+      if (savePreview.value?.objectUrl) URL.revokeObjectURL(savePreview.value.objectUrl)
+    })
+    return { canvas, handCanvas, qrCanvas, activeTab, config, typeName, toast, savePreview, companyDisclaimerOpen, companyDisclaimerAccepted, handColor, handWidth, handSaved, handHistory, isMobileView, handUrl, chooseTab, chooseCenter, download, downloadSavePreview, shareSavePreview, closeSavePreview, closeCompanyDisclaimer, confirmCompanyDisclaimer, startHand, drawHand, endHand, clearHand, undoHand, saveHand }
   },
   template: `
     <div class="app-shell">
@@ -664,7 +679,7 @@ const app = {
           </section>
 
           <section v-if="activeTab === 'personal'" class="control-section signature-section"><div class="section-title"><span>03</span><h2>签名规格</h2></div>
-            <div class="radio-group company-size-options"><label class="radio-option"><input type="radio" value="16x16" v-model="config.signatureSize" /><span>16*16mm</span></label><label class="radio-option"><input type="radio" value="18x18" v-model="config.signatureSize" /><span>18*18mm</span></label><label class="radio-option"><input type="radio" value="20x20" v-model="config.signatureSize" /><span>20*20mm</span></label><label class="radio-option"><input type="radio" value="22x22" v-model="config.signatureSize" /><span>22*22mm</span></label></div>
+            <div class="radio-group company-size-options personal-size-options"><label class="radio-option"><input type="radio" value="16x16" v-model="config.signatureSize" /><span>16*16mm</span></label><label class="radio-option"><input type="radio" value="18x18" v-model="config.signatureSize" /><span>18*18mm</span></label><label class="radio-option"><input type="radio" value="20x20" v-model="config.signatureSize" /><span>20*20mm</span></label><label class="radio-option"><input type="radio" value="22x22" v-model="config.signatureSize" /><span>22*22mm</span></label></div>
             <div class="signature-subtitle">选择签名内容</div><div class="radio-group content-options"><label class="radio-option"><input type="radio" value="name" v-model="config.signatureContent" /><span>姓名</span></label><label class="radio-option"><input type="radio" value="nameSeal" v-model="config.signatureContent" /><span>姓名+印</span></label><label class="radio-option"><input type="radio" value="nameZhi" v-model="config.signatureContent" /><span>姓名+之印</span></label></div>
             <div class="color-row signature-color-row"><span>签名颜色</span><div class="swatches"><button v-for="item in [{c:'#ef1d2c', n:'朱红'},{c:'#1622da',n:'宝蓝'},{c:'#111111',n:'黑色'}]" :key="item.c" :title="item.n" :style="{background:item.c}" :class="['swatch',{selected:config.color===item.c}]" @click="config.color=item.c"></button></div></div>
           </section>
@@ -689,8 +704,12 @@ const app = {
       <transition name="save-preview">
         <div v-if="savePreview" class="save-preview" role="dialog" aria-modal="true" aria-labelledby="save-preview-title" @click.self="closeSavePreview">
           <div class="save-preview__panel">
-            <div class="save-preview__head"><h2 id="save-preview-title">长按保存图片</h2><button class="save-preview__close" type="button" title="关闭" aria-label="关闭保存图片窗口" @click="closeSavePreview">×</button></div>
+            <div class="save-preview__head"><h2 id="save-preview-title">保存透明 PNG</h2><button class="save-preview__close" type="button" title="关闭" aria-label="关闭保存图片窗口" @click="closeSavePreview">×</button></div>
             <div class="save-preview__image"><img :src="savePreview.src" :alt="savePreview.filename" /></div>
+            <div class="save-preview__body">
+              <p>长按上方图片可直接保存。若浏览器支持，也可以尝试下面的保存方式。</p>
+              <div class="save-preview__actions"><button class="primary-action" type="button" @click="downloadSavePreview">↓ 下载 PNG</button><button v-if="savePreview.canShare" class="ghost-action" type="button" @click="shareSavePreview">系统分享 / 保存</button></div>
+            </div>
           </div>
         </div>
       </transition>
