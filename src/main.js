@@ -3,6 +3,8 @@ import { createApp, computed, nextTick, onBeforeUnmount, onMounted, reactive, re
 import QRCode from 'qrcode'
 import './style.css'
 
+document.documentElement.classList.toggle('is-embedded', new URLSearchParams(window.location.search).get('embed') === '1')
+
 const palettes = {
   seal: '#b9342e',
   vermilion: '#c53b32',
@@ -403,6 +405,9 @@ const app = {
     const qrCanvas = ref(null)
     const activeTab = ref(initialTab)
     const toast = ref('')
+    const savePreview = ref(null)
+    const companyDisclaimerOpen = ref(false)
+    const companyDisclaimerAccepted = ref(false)
     const handColor = ref('#b9342e')
     const handWidth = ref(7)
     const handSaved = ref(false)
@@ -424,6 +429,63 @@ const app = {
     const typeName = computed(() => ({ company: '公司印章', personal: '个人印章', signature: '个人签名' }[activeTab.value]))
     const handUrl = computed(() => `${window.location.origin}${window.location.pathname}?tab=signature`)
 
+    function showToast(message) {
+      toast.value = message
+      window.setTimeout(() => {
+        if (toast.value === message) toast.value = ''
+      }, 2200)
+    }
+    function makePngFile(canvasEl, name) {
+      const baseName = String(name || '图片').trim().replace(/[\\/:*?"<>|]/g, '-') || '图片'
+      const filename = `${baseName.replace(/\.png$/i, '').slice(0, 80)}.png`
+      const dataUrl = canvasEl.toDataURL('image/png')
+      const binary = window.atob(dataUrl.split(',')[1])
+      const bytes = new Uint8Array(binary.length)
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+      const blob = new Blob([bytes], { type: 'image/png' })
+      const file = typeof File === 'function' ? new File([blob], filename, { type: 'image/png' }) : null
+      return { blob, dataUrl, file, filename }
+    }
+    function canShareFile(file) {
+      if (!file || typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') return false
+      try {
+        return navigator.canShare({ files: [file] })
+      } catch {
+        return false
+      }
+    }
+    async function saveCanvasPng(canvasEl, name) {
+      if (!canvasEl) throw new Error('Canvas is not ready')
+      const image = makePngFile(canvasEl, name)
+      const prefersMobileSave = isMobileView.value || window.matchMedia?.('(pointer: coarse)').matches
+
+      if (prefersMobileSave) {
+        if (canShareFile(image.file)) {
+          try {
+            await navigator.share({ files: [image.file], title: image.filename })
+            return 'shared'
+          } catch (error) {
+            if (error?.name === 'AbortError') return 'cancelled'
+          }
+        }
+
+        savePreview.value = { src: image.dataUrl, filename: image.filename }
+        return 'preview'
+      }
+
+      const objectUrl = URL.createObjectURL(image.blob)
+      const link = document.createElement('a')
+      link.download = image.filename
+      link.href = objectUrl
+      link.hidden = true
+      document.body.append(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000)
+      return 'download'
+    }
+    function closeSavePreview() { savePreview.value = null }
+
     function repaint() { nextTick(() => drawSeal(canvas.value, config)) }
     function chooseTab(tab) {
       activeTab.value = tab
@@ -436,13 +498,33 @@ const app = {
       config.center = type === 'star' ? '★' : type === 'flower' ? '✤' : config.center
       repaint()
     }
+    async function exportCurrentCanvas() {
+      try {
+        const result = await saveCanvasPng(canvas.value, config.title || '我的印章')
+        if (result === 'shared') showToast('已完成系统保存或分享操作')
+        if (result === 'download') showToast('已开始下载，请查看浏览器下载记录')
+      } catch (error) {
+        console.error(error)
+        showToast('图片生成失败，请重试')
+      }
+    }
     function download() {
-      const link = document.createElement('a')
-      link.download = `${config.title || '我的印章'}.png`
-      link.href = canvas.value.toDataURL('image/png')
-      link.click()
-      toast.value = '透明 PNG 已下载'
-      setTimeout(() => (toast.value = ''), 1800)
+      if (activeTab.value === 'company') {
+        companyDisclaimerAccepted.value = false
+        companyDisclaimerOpen.value = true
+        return
+      }
+      exportCurrentCanvas()
+    }
+    function closeCompanyDisclaimer() {
+      companyDisclaimerOpen.value = false
+      companyDisclaimerAccepted.value = false
+    }
+    async function confirmCompanyDisclaimer() {
+      if (!companyDisclaimerAccepted.value) return
+      companyDisclaimerOpen.value = false
+      companyDisclaimerAccepted.value = false
+      await exportCurrentCanvas()
     }
     function initHandCanvas() {
       if (!handCanvas.value) return
@@ -497,15 +579,17 @@ const app = {
     function endHand() { handDrawing.value = false }
     function clearHand() { handHistory.value = []; handSaved.value = false; renderHand() }
     function undoHand() { handHistory.value.pop(); handSaved.value = false; renderHand() }
-    function saveHand() {
-      if (!handHistory.value.length) { toast.value = '请先在签名板上写下签名'; setTimeout(() => (toast.value = ''), 1800); return }
-      const link = document.createElement('a')
-      link.download = '手绘签名.png'
-      link.href = handCanvas.value.toDataURL('image/png')
-      link.click()
-      handSaved.value = true
-      toast.value = '手绘签名已下载'
-      setTimeout(() => (toast.value = ''), 1800)
+    async function saveHand() {
+      if (!handHistory.value.length) { showToast('请先在签名板上写下签名'); return }
+      try {
+        const result = await saveCanvasPng(handCanvas.value, '手绘签名')
+        if (result !== 'cancelled') handSaved.value = true
+        if (result === 'shared') showToast('已完成系统保存或分享操作')
+        if (result === 'download') showToast('已开始下载，请查看浏览器下载记录')
+      } catch (error) {
+        console.error(error)
+        showToast('图片生成失败，请重试')
+      }
     }
     async function makeQr() {
       await nextTick()
@@ -534,13 +618,13 @@ const app = {
       else repaint()
     })
     onBeforeUnmount(() => window.removeEventListener('resize', updateViewport))
-    return { canvas, handCanvas, qrCanvas, activeTab, config, typeName, toast, handColor, handWidth, handSaved, handHistory, isMobileView, handUrl, chooseTab, chooseCenter, download, startHand, drawHand, endHand, clearHand, undoHand, saveHand }
+    return { canvas, handCanvas, qrCanvas, activeTab, config, typeName, toast, savePreview, companyDisclaimerOpen, companyDisclaimerAccepted, handColor, handWidth, handSaved, handHistory, isMobileView, handUrl, chooseTab, chooseCenter, download, closeSavePreview, closeCompanyDisclaimer, confirmCompanyDisclaimer, startHand, drawHand, endHand, clearHand, undoHand, saveHand }
   },
   template: `
     <div class="app-shell">
       <header class="topbar">
         <div class="brand"><span class="brand-mark">印</span><div><div class="brand-name">Seal Studio</div><div class="brand-caption">轻量印章生成器</div></div></div>
-        <div class="top-actions"><span class="status-dot"></span><span>本地生成 · 数据不上传</span></div>
+        <div class="top-actions"><a class="home-link" href="https://quickso.top/" target="_top"><span aria-hidden="true">←</span> QuickSo 首页</a><span class="status-dot"></span><span>本地生成 · 数据不上传</span></div>
       </header>
 
       <main class="workspace">
@@ -601,6 +685,27 @@ const app = {
           <div class="signature-mobile-content"><div class="signature-mobile-head"><span class="eyebrow">HANDWRITTEN SIGNATURE</span><h2>手绘签名</h2></div><div class="hand-board-wrap"><div class="hand-checker"></div><canvas ref="handCanvas" class="hand-canvas" @pointerdown="startHand" @pointermove="drawHand" @pointerup="endHand" @pointercancel="endHand" @pointerleave="endHand"></canvas><span class="hand-board-hint" v-if="!handHistory.length">在这里签名</span></div><div class="hand-tools"><div class="hand-colors"><span>颜色</span><button v-for="item in [{c:'#b9342e',n:'朱砂红'},{c:'#1622da',n:'宝蓝'},{c:'#111111',n:'黑色'}]" :key="item.c" :title="item.n" :style="{background:item.c}" :class="['swatch',{selected:handColor===item.c}]" @click="handColor=item.c"></button></div><label class="hand-width"><span>笔触</span><input type="range" min="3" max="14" v-model.number="handWidth" /></label><button class="ghost-action" @click="undoHand">↶ 撤销</button><button class="ghost-action" @click="clearHand">清空</button><button class="primary-action" @click="saveHand">↓ 导出透明 PNG</button></div><div class="hand-tip"><span class="tip-mark">i</span><span>签名只在当前设备中处理，不会上传服务器。</span></div></div>
         </section>
       </main>
+      <footer class="legal-disclaimer" role="note">本工具仅作图像生成技术演示，不具备任何法律效力，严禁用于伪造文件。</footer>
+      <transition name="save-preview">
+        <div v-if="savePreview" class="save-preview" role="dialog" aria-modal="true" aria-labelledby="save-preview-title" @click.self="closeSavePreview">
+          <div class="save-preview__panel">
+            <div class="save-preview__head"><h2 id="save-preview-title">长按保存图片</h2><button class="save-preview__close" type="button" title="关闭" aria-label="关闭保存图片窗口" @click="closeSavePreview">×</button></div>
+            <div class="save-preview__image"><img :src="savePreview.src" :alt="savePreview.filename" /></div>
+          </div>
+        </div>
+      </transition>
+      <transition name="save-preview">
+        <div v-if="companyDisclaimerOpen" class="save-preview disclaimer-modal" role="dialog" aria-modal="true" aria-labelledby="company-disclaimer-title">
+          <div class="save-preview__panel disclaimer-modal__panel">
+            <div class="save-preview__head"><h2 id="company-disclaimer-title">导出前确认</h2><button class="save-preview__close" type="button" title="取消导出" aria-label="取消导出" @click="closeCompanyDisclaimer">×</button></div>
+            <div class="disclaimer-modal__body">
+              <p>本工具仅作图像生成技术演示，不具备任何法律效力，严禁用于伪造文件。</p>
+              <label class="disclaimer-check"><input v-model="companyDisclaimerAccepted" type="checkbox" /><span>我承诺不将其用于任何违法用途</span></label>
+              <div class="disclaimer-modal__actions"><button class="ghost-action" type="button" @click="closeCompanyDisclaimer">取消</button><button class="primary-action" type="button" :disabled="!companyDisclaimerAccepted" @click="confirmCompanyDisclaimer">同意并导出</button></div>
+            </div>
+          </div>
+        </div>
+      </transition>
       <transition name="toast"><div v-if="toast" class="toast">{{ toast }}</div></transition>
     </div>
   `,

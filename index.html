@@ -4,10 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#171817" />
-    <title>Seal Studio · 印章生成器</title>
+    <meta name="description" content="QuickSo 电子印章生成器，在浏览器本地生成透明 PNG 印章和手绘签名，仅作图像生成技术演示。" />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://seal.quickso.top/" />
+    <link rel="icon" href="https://quickso.top/icon.jpg" type="image/jpeg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="QuickSo 电子印章生成器" />
+    <meta property="og:description" content="在浏览器本地生成透明 PNG 印章和手绘签名，仅作图像生成技术演示。" />
+    <meta property="og:url" content="https://seal.quickso.top/" />
+    <meta property="og:site_name" content="QuickSo" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:image" content="https://quickso.top/icon.jpg" />
+    <meta property="og:image:alt" content="QuickSo 电子印章工具图标" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="QuickSo 电子印章生成器" />
+    <meta name="twitter:description" content="在浏览器本地生成透明 PNG 印章和手绘签名。" />
+    <meta name="twitter:image" content="https://quickso.top/icon.jpg" />
+    <title>QuickSo 电子印章生成器 | 透明 PNG 印章</title>
+    <script>
+      if (new URLSearchParams(window.location.search).get('embed') === '1') {
+        document.querySelector('meta[name="robots"]').setAttribute('content', 'noindex,follow')
+      }
+    </script>
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"WebApplication","name":"QuickSo 电子印章生成器","url":"https://seal.quickso.top/","description":"在浏览器本地生成透明 PNG 印章和手绘签名，仅作图像生成技术演示。","applicationCategory":"DesignApplication","operatingSystem":"Web Browser","inLanguage":"zh-CN"}
+    </script>
   </head>
   <body>
     <div id="app"></div>
+    <noscript>QuickSo 电子印章生成器是一款本地图片生成工具。请启用 JavaScript 使用。</noscript>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
