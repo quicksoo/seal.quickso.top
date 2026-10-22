@@ -185,12 +185,14 @@ function drawCompanySeal(ctx, config, color) {
     ctx.font = `${Math.round(19 * sizeScale)}px ui-monospace, SFMono-Regular, Menlo, monospace`
     if (config.bottomTextStyle === 'arc') {
       const chars = [...bottom]
-      const arcStart = Math.PI * 0.2
+      // Canvas angles increase clockwise, so start at the lower-left and move
+      // toward the lower-right to keep the entered text in normal reading order.
+      const arcStart = Math.PI * 0.8
       const arcSpan = Math.PI * 0.6
       const arcRadiusX = rx - 46
       const arcRadiusY = ry - 46
       chars.forEach((char, index) => {
-        const angle = chars.length === 1 ? Math.PI / 2 : arcStart + (arcSpan * index) / (chars.length - 1)
+        const angle = chars.length === 1 ? Math.PI / 2 : arcStart - (arcSpan * index) / (chars.length - 1)
         ctx.save()
         ctx.translate(cx + Math.cos(angle) * arcRadiusX, cy + Math.sin(angle) * arcRadiusY)
         ctx.rotate(angle - Math.PI / 2)
