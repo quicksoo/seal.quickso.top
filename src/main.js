@@ -2,6 +2,7 @@
 import { createApp, computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue/dist/vue.esm-bundler.js'
 import QRCode from 'qrcode'
 import './style.css'
+import { followQrUrl, showFollowPrompt } from './follow-prompt'
 
 document.documentElement.classList.toggle('is-embedded', new URLSearchParams(window.location.search).get('embed') === '1')
 
@@ -472,13 +473,14 @@ const app = {
 
       if (prefersMobileSave) {
         const objectUrl = URL.createObjectURL(image.blob)
-        savePreview.value = { ...image, objectUrl, canShare: canShareFile(image.file) }
+        savePreview.value = { ...image, src: image.dataUrl, objectUrl, canShare: canShareFile(image.file) }
         return 'preview'
       }
 
       const objectUrl = URL.createObjectURL(image.blob)
       triggerPngDownload({ ...image, objectUrl })
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000)
+      showFollowPrompt()
       return 'download'
     }
     function downloadSavePreview() {
@@ -635,7 +637,7 @@ const app = {
       window.removeEventListener('resize', updateViewport)
       if (savePreview.value?.objectUrl) URL.revokeObjectURL(savePreview.value.objectUrl)
     })
-    return { canvas, handCanvas, qrCanvas, activeTab, config, typeName, toast, savePreview, companyDisclaimerOpen, companyDisclaimerAccepted, handColor, handWidth, handSaved, handHistory, isMobileView, handUrl, chooseTab, chooseCenter, download, downloadSavePreview, shareSavePreview, closeSavePreview, closeCompanyDisclaimer, confirmCompanyDisclaimer, startHand, drawHand, endHand, clearHand, undoHand, saveHand }
+    return { followQrUrl, canvas, handCanvas, qrCanvas, activeTab, config, typeName, toast, savePreview, companyDisclaimerOpen, companyDisclaimerAccepted, handColor, handWidth, handSaved, handHistory, isMobileView, handUrl, chooseTab, chooseCenter, download, downloadSavePreview, shareSavePreview, closeSavePreview, closeCompanyDisclaimer, confirmCompanyDisclaimer, startHand, drawHand, endHand, clearHand, undoHand, saveHand }
   },
   template: `
     <div class="app-shell">
@@ -711,6 +713,7 @@ const app = {
             <div class="save-preview__body">
               <p>长按上方图片可直接保存。若浏览器支持，也可以尝试下面的保存方式。</p>
               <div class="save-preview__actions"><button class="primary-action" type="button" @click="downloadSavePreview">↓ 下载 PNG</button><button v-if="savePreview.canShare" class="ghost-action" type="button" @click="shareSavePreview">系统分享 / 保存</button></div>
+              <section class="quickso-follow-card" aria-label="关注 QuickSo 公众号"><h2>更多工具请关注公众号</h2><p class="quickso-follow-name">QuickSo</p><img :src="followQrUrl" alt="QuickSo 微信公众号二维码" width="180" height="180" /><p class="quickso-follow-hint">微信扫码关注，手机可长按二维码保存或识别</p></section>
             </div>
           </div>
         </div>

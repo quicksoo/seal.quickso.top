@@ -1,0 +1,16 @@
+.quickso-follow-card {
+  box-sizing: border-box; display: flex; flex-direction: column; align-items: center;
+  gap: 10px; padding: 22px 12px; text-align: center; color: #333d35;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  border-top: 1px solid #e4e8e3; margin-top: 20px;
+}
+.quickso-follow-card h2 { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.6; letter-spacing: 0; }
+.quickso-follow-card .quickso-follow-name { margin: 0; color: #6e7b70; font-size: 12px; line-height: 1.5; }
+.quickso-follow-card > img { display: block; width: 180px; height: 180px; max-width: 100%; object-fit: contain; background: #fff; border: 0; border-radius: 0; padding: 0; -webkit-touch-callout: default; user-select: auto; }
+.quickso-follow-card .quickso-follow-hint { margin: 0; color: #8a938b; font-size: 11px; line-height: 1.8; font-weight: 400; }
+dialog.quickso-follow-dialog { box-sizing: border-box; position: fixed; inset: 0; margin: auto; width: 360px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 24px; overflow: auto; border: 1px solid #e2e7e1; border-radius: 10px; background: #fff; color: #333d35; box-shadow: 0 18px 60px #132c2330; }
+dialog.quickso-follow-dialog::backdrop { background: rgb(24 34 28 / .48); }
+.quickso-follow-dialog .quickso-follow-card { border-top: 0; margin: 0; padding: 3px 0 0; }
+.quickso-follow-card .quickso-follow-close { margin-top: 5px; width: 100%; min-height: 38px; padding: 9px 15px; border: 1px solid #d8e2d9; border-radius: 6px; background: #f5f8f4; color: #4a6852; cursor: pointer; font: inherit; font-size: 13px; font-weight: 500; line-height: 1.5; }
+.quickso-follow-card .quickso-follow-close:focus-visible { outline: 3px solid #a2c6ae; outline-offset: 3px; }
+@media print { .quickso-follow-card, dialog.quickso-follow-dialog, dialog.quickso-follow-dialog::backdrop { display: none !important; } }
